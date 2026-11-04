@@ -1,0 +1,15 @@
+{
+  "initial_raw_rows": 7573360,
+  "aggregate_spikes_gt_15kw": 171,
+  "iam_spikes_gt_4kw": 3895,
+  "bst_rows_adjusted_utc": 4104740,
+  "duplicate_rows_skipped": 1016085,
+  "duplicate_groups_exact_repeats": 914781,
+  "duplicate_groups_conflicting": 101304,
+  "total_1min_grid_minutes": 920031,
+  "missing_minutes_before_fill": 122172,
+  "short_gap_minutes_filled": 1989,
+  "outage_minutes_flagged": 121530,
+  "missing_minutes_remaining": 120183,
+  "percent_coverage": 86.94
+}

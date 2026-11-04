@@ -1,0 +1,22 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+.pytest_cache/
+
+# Data files (NEVER commit raw or processed REFIT data or archives)
+data/
+*.csv
+*.7z
+*.zip
+*.tar.gz
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# OS files
+.DS_Store
+Thumbs.db

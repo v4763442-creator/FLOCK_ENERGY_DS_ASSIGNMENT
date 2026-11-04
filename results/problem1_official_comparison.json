@@ -1,0 +1,9 @@
+{
+  "common_valid_minutes": 791810,
+  "aggregate_mae_watts": 56.38,
+  "aggregate_rmse_watts": 392.36,
+  "aggregate_pearson_corr": 0.86916,
+  "washing_machine_mae_watts": 3.91,
+  "washing_machine_rmse_watts": 79.66,
+  "washing_machine_pearson_corr": 0.83282
+}
