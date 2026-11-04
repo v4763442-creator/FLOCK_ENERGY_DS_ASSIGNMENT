@@ -5,13 +5,6 @@ __pycache__/
 .ipynb_checkpoints/
 .pytest_cache/
 
-# Data files (NEVER commit raw or processed REFIT data or archives)
-data/
-*.csv
-*.7z
-*.zip
-*.tar.gz
-
 # Virtual environment
 venv/
 .venv/
@@ -20,3 +13,21 @@ env/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Data files, archives and parquet caches (NEVER commit raw or processed REFIT data or archives)
+data/
+*.parquet
+*.7z
+*.zip
+*.tar.gz
+
+# Ignore all CSVs except those in results/
+*.csv
+!results/*.csv
+
+# Allow JSON files in results/
+!results/*.json
+
+# Local interview notes and scratch checkpoints (local only)
+INTERVIEW_NOTES.md
+results/checkpoint_*.md

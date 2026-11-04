@@ -1,169 +1,71 @@
-# DATA.md: REFIT Dataset Documentation, Raw Quality Findings, and Cleaning Pipeline
-
-**Project:** Flock Energy Take-Home — REFIT Data Cleaning and Appliance Disaggregation  
-**Author:** Fourth-Year Engineering Student (Data Science & ML Engineering Take-Home)  
-**Data Reference:** University of Strathclyde REFIT Electrical Load Measurements  
+# DATA.md: Data Coverage, Raw Quality Findings, and Cleaning Decisions
 
 ---
 
-## 1. Dataset Overview and Scope
+## 1. Household Data Coverage and Units
 
-This project utilizes the **REFIT Electrical Load Measurements** dataset collected by the University of Strathclyde, Loughborough University, and the University of East Anglia (supported by EPSRC). The dataset encompasses active power measurements recorded from 20 detached, semi-detached, and terraced houses in the Loughborough area (UK) between 2013 and 2015.
+All measurements are from the University of Strathclyde REFIT dataset covering UK domestic residences. Active power is recorded in **Watts (W)** at an event-driven nominal sampling rate of 6–8 seconds.
 
-### 1.1 Files Inspected and Processed
-All inputs are located in the parent directory `D:\FLOCK_ASSIGNMENT\` and are treated as strictly read-only:
-
-| File Name | File Size on Disk | Total Rows | Temporal Coverage | Channel Details |
-| :--- | :--- | :--- | :--- | :--- |
-| **`RAW_House1_Part1.csv`** | 232.27 MB | 4,377,877 | `2013-10-09 14:06:17` to `2014-10-01 01:27:07` | 12 cols: `Time`, `Unix`, `Aggregate`, `Appliance1`..`9` |
-| **`RAW_House1_Part2.csv`** | 228.55 MB | 4,140,886 | `2014-06-27 21:57:50` to `2015-07-10 11:56:32` | 12 cols: `Time`, `Unix`, `Aggregate`, `Appliance1`..`9` |
-| **`CLEAN_House1.csv`** | 382.27 MB | 6,960,008 | `2013-10-09 13:06:17` to `2015-07-10 11:56:32` | 13 cols: Same as raw + `Issues` |
-| **`CLEAN_House2.csv`** | 310.32 MB | 5,733,526 | `2013-09-17 22:08:11` to `2015-05-28 08:05:43` | 13 cols: Same as raw + `Issues` |
-| **`CLEAN_House3.csv`** | 388.41 MB | 6,994,594 | `2013-09-25 19:21:09` to `2015-06-02 10:55:42` | 13 cols: Same as raw + `Issues` |
-| **`CLEAN_House4.csv`** | 377.43 MB | 6,760,511 | `2013-10-11 10:19:17` to `2015-07-07 09:57:38` | 13 cols: Same as raw + `Issues` |
-| **`CLEAN_House5.csv`** | 415.11 MB | 7,430,755 | `2013-09-26 09:56:09` to `2015-07-06 17:48:55` | 13 cols: Same as raw + `Issues` |
-
-### 1.2 Measurement Units and Sensor Architecture
-- **Metric:** Active electrical power in **Watts (W)**.
-- **Whole-Home Aggregate:** Measured via an optical pulse sensor or current transformer (CT) clamp attached to the incoming mains utility phase meter.
-- **Individual Appliance Monitors (IAMs):** Plug-through sub-meters (plugged into standard BS 1363 UK 13A wall sockets) recording downstream appliance active power.
-- **Nominal Sampling Interval:** Nominally 6–8 seconds. Sensors logged readings asynchronously whenever a load change was detected; intermediate values were held/forward-filled.
+| File / House | Channel Used | Monitored Days | Cleaned 1-Min Bins | Usable Coverage % | Notes |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **House 1 (Raw & Clean)** | `Appliance5` | 639.0 days | 920,031 | 86.94% | Beko WMC6140. App4 is Creda T522VW tumble dryer. |
+| **House 2 (Clean)** | `Appliance2` | 617.4 days | 889,078 | 75.38% | LG F1289TD. 24.6% missing (Feb 2014 outage). |
+| **House 3 (Clean)** | `Appliance6` | 614.6 days | 885,095 | 88.62% | Unknown washing machine. |
+| **House 4 (Clean)** | `Appliance4` & `5` | 633.9 days | 912,939 | 94.61% | WM1 (Servis 6065) and WM2 (Zanussi Z917). |
+| **House 5 (Clean)** | `Appliance3` | 648.3 days | 933,593 | 90.66% | AEG L99695HWD washer-dryer. |
 
 ---
 
-## 2. Dataset Limitations and Anomalies Identified
+## 2. Raw House 1 Findings and Diagnostic Counts
 
-1. **Sub-Meter Sum Exceeding Aggregate (`Issues` Flag):**
-   In the official cleaned files, an extra column `Issues` is set to `1` whenever $\sum_{i=1}^9 \text{Appliance}_i > \text{Aggregate}$.
-   - House 1: 58,183 rows (0.84%)
-   - House 2: 28,444 rows (0.50%)
-   - House 3: 408,627 rows (5.84%)
-   - House 4: 67,441 rows (1.00%)
-   - House 5: 425,766 rows (5.73%)  
-   *Handling:* These discrepancies arise from asynchronous sensor polling delays (one plug detects a surge 3 seconds before the aggregate clamp registers it) or clamp calibration drift. During modeling, rows flagged with `Issues == 1` are masked or excluded from evaluation to avoid training on inconsistent balances.
-2. **Database Iteration Divergence (`Part1` vs `Part2`):**
-   - In `RAW_House1_Part1`, unpolled or disconnected sensors were recorded as `0`. Therefore, a `0 W` reading in Part 1 is fundamentally ambiguous (cannot distinguish true powered-off state from a dropped telemetry poll).
-   - In `RAW_House1_Part2`, unpolled sensors were recorded as `NaN`.
-3. **The 95-Day Boundary Overlap:**
-   Part 1 and Part 2 share an overlap window of **95.1 days** (`2014-06-27 21:57:50` to `2014-10-01 01:27:07`), sharing 191,889 distinct timestamps. Cross-correlation between Part 1 and Part 2 aggregates at 0-second offset is $r = 0.7887$ (MAE = 57.80 W), whereas at $\pm 3600\text{ s}$ offset the correlation drops to $r \approx 0.03$. This proves that both parts share the same clock reference. Our pipeline transitions from Part 1 to Part 2 exactly at `2014-10-01 01:27:07`, matching the official Strathclyde dataset demarcation.
-4. **Major Telemetry Outages:**
-   Significant multi-day data outages occurred during the study, most notably in February 2014, caused by home broadband router disconnects, gateway power failures, and base station reboots.
+All counts below were computed directly by our cleaning pipeline on House 1 (combining `RAW_House1_Part1.csv` and `Part2.csv`, totaling **7,573,360 raw rows**):
 
----
+### 2.1 The Part 1 / Part 2 Boundary Overlap
+- **The Overlap Window:** Part 1 ends on `2014-10-01 01:27:07`. Part 2 begins on `2014-06-27 21:57:50`. The two parts overlap for **95.1 days** (sharing 191,889 distinct timestamps).
+- **Offset Verification:** Resampling both parts to 1-minute in the overlap yields a Pearson correlation of **$r = 0.7887$ (MAE = 57.80 W) at 0 seconds offset**. At $\pm 3600\text{ s}$ offset, correlation drops to $r \approx 0.03$. This confirms that both parts share the exact same clock reference.
+- **Sensor Ambiguity in Part 1:** As documented in the Strathclyde readme, Part 1 substituted unpolled or unavailable sensors with `0`, whereas Part 2 substituted them with `NaN`. Consequently, in the Part-1-only period (Oct 2013 to Jun 2014), a reading of `0 W` is ambiguous—it cannot distinguish a true powered-off state from a temporary sensor dropout.
+- **Merge Decision:** We transition from Part 1 to Part 2 exactly at `2014-10-01 01:27:07` where Part 1 ended, matching the official Strathclyde dataset demarcation.
 
-## 3. Raw Data Quality Findings (House 1)
+### 2.2 Daylight Savings Time (DST) Transitions Handled
+The raw logger recorded local UK wall-clock time as naive Unix timestamps without timezone awareness. We handled four clock transitions across the monitoring period:
+1. **Autumn 2013 (2013-10-27):** Clocks fell back from 02:00 BST to 01:00 GMT. Raw Unix timestamps jumped backward by **$-3,597\text{ seconds}$** (row 249,600: `01:59:59`, Unix 1382839198 $\to$ row 249,601: `01:00:01`, Unix 1382835601).
+2. **Spring 2014 (2014-03-30):** Clocks sprang forward from 01:00 GMT to 02:00 BST, creating an artificial **$+3,605\text{ second}$ gap** in raw timestamps.
+3. **Autumn 2014 (2014-10-26):** Local clock transitioned from BST to GMT.
+4. **Spring 2015 (2015-03-29):** Clocks sprang forward from 01:00 GMT to 02:00 BST, creating a **$+3,607\text{ second}$ gap**.
 
-Every number reported below was computed directly by the cleaning pipeline and matches `results/problem1_summary.json` exactly:
+**Resolution:** We shifted all **4,104,740 rows (54.20%)** logged during British Summer Time (BST) by **-3,600 seconds** (`Unix - 3600`). This completely eliminated backward time travel and fake spring outages, producing a strictly monotonic UTC time series.
 
-```json
-{
-  "initial_raw_rows": 7573360,
-  "aggregate_spikes_gt_15kw": 171,
-  "iam_spikes_gt_4kw": 3895,
-  "bst_rows_adjusted_utc": 4104740,
-  "duplicate_rows_skipped": 1016085,
-  "duplicate_groups_exact_repeats": 914781,
-  "duplicate_groups_conflicting": 101304,
-  "total_1min_grid_minutes": 920031,
-  "missing_minutes_before_fill": 122172,
-  "short_gap_minutes_filled": 1989,
-  "outage_minutes_flagged": 121530,
-  "missing_minutes_remaining": 120183,
-  "percent_coverage": 86.94
-}
-```
+### 2.3 Spike Filtering Justified by Data Distribution
+- **Single-Appliance Sockets (> 4,000 W):** UK domestic plug monitors (IAMs) operate on BS 1363 sockets with 13A fuses ($13\text{A} \times 230\text{V} \approx 3,000\text{W}$). Any reading $> 4,000\text{W}$ is an unphysical telemetry error. In raw data, **3,895 spikes $> 4,000\text{W}$** were detected (including glitch values reaching 76,677 W on the fridge and 98,301 W on the freezer). These were set to `NaN`.
+- **Whole-Home Aggregate (> 15,000 W):** Over **99.99% of valid aggregate readings are below 12,000 W**. Readings between 12,000 W and 15,000 W are rare but legitimate multi-appliance combinations (e.g. an electric shower at 9.5–10.5 kW plus an electric kettle or toaster at 2–3 kW). Above 15,000 W, readings drop to fewer than 100 isolated points that hit flat-top current transformer (CT) saturation limits (24,000 W in Part 1 and 29,159 W in Part 2). Capping aggregate power at **15,000 W** eliminated **171 saturation spikes** while preserving real domestic load surges.
 
-### 3.1 Unphysical Power Spikes and Extreme Values
-- **Single-Appliance IAM Spikes (> 4,000 W):**
-  UK domestic appliances plug into BS 1363 sockets rated at $13\text{ A} \times 230\text{ V} \approx 2,990\text{ W}$ (maximum transient fuse ceiling $\approx 3.5 - 4\text{ kW}$). In the raw telemetry, corruption produced impossible spikes:
-  - Appliance 1 (Fridge): Max **76,677 W** (662 spikes $> 4\text{ kW}$)
-  - Appliance 2 (Freezer): Max **98,301 W** (18 spikes $> 4\text{ kW}$)
-  - Appliance 4 (Tumble Dryer): Max **98,301 W** (2,014 spikes $> 4\text{ kW}$)
-  - Appliance 5 (Washing Machine): Max **73,725 W** (156 spikes $> 4\text{ kW}$)
-  - Across all sub-meters, **3,895 unphysical readings $> 4,000\text{ W}$** were detected.
-- **Whole-Home Aggregate Spikes (> 15,000 W):**
-  A standard UK domestic main cut-out fuse is rated at 80A or 100A single-phase ($230\text{ V} \times 100\text{ A} = 23\text{ kW}$). Empirical distribution analysis shows that genuine domestic loads (electric shower at 9.5–10.5 kW plus simultaneous kettle at 3 kW) reach 12–14 kW. Beyond 15 kW, readings represent isolated CT clamp saturation flat-tops (clamping at 24,000 W or 29,159 W). Setting an upper limit at **15,000 W** safely preserves genuine shower cycles while eliminating **171 CT saturation spikes**.
-- **Negative Power Readings:**
-  Zero instances of negative power were observed ($\min = 0\text{ W}$).
-
-### 3.2 Timezone and Daylight Savings (BST vs UTC)
-The raw logger recorded naive timestamps from the local UK operating system clock:
-- **Autumn Clock Fallback:** On `2013-10-27 01:59:59`, the local wall clock stepped back to `01:00:01`, causing a **-3,597 second backward jump** in Unix epoch timestamps.
-- **Spring Clock Forward:** On `2014-03-30 00:59:58`, the local wall clock skipped forward to `02:00:02`, producing an artificial **+3,605 second gap**.
-- **Correction:** A total of **4,104,740 rows (54.20% of data)** logged during British Summer Time (BST) were shifted by **-3,600 seconds** (`Unix - 3600`). This completely eliminated all negative jumps and fake spring outages, establishing a strictly monotonic UTC time series.
-
-### 3.3 Timestamp Duplication
-- **Duplicate Rows:** **1,016,085 duplicate rows** were identified.
-- **Consistency Analysis:**
-  - **914,781 groups (90.03%)** were **exact repeats** across all channels (caused by sensor re-transmissions).
-  - **101,304 groups (9.97%)** contained **conflicting channel values** (caused by separate asynchronous sub-meter packets sharing the same integer second).
-- **Resolution:** The first valid reading per second was retained, avoiding artificial variance distortion.
+### 2.4 Duplicate Timestamps
+- Identified **1,016,085 duplicate rows** in raw House 1.
+- Grouping duplicate timestamps revealed that **914,781 groups (90.03%) were exact repeats** across all channels (caused by sensor re-transmissions). Only **101,304 groups (9.97%)** contained conflicting values (caused by separate asynchronous sub-meter packets arriving within the same integer second). The first valid reading per second was retained.
 
 ---
 
-## 4. The Cleaning and Resampling Pipeline
+## 3. Cleaning Decisions and Gap Policy
 
-The pipeline follows a strict, physically justified sequence implemented in `src/cleaning.py`:
-
-```mermaid
-flowchart TD
-    A["Raw House 1 Data (Part 1 + Part 2, 7.57M rows)"] --> B["1. Set Unphysical Spikes to NaN FIRST (Agg > 15kW, IAM > 4kW)"]
-    B --> C["2. Correct Timezone to UTC (Shift BST rows by -3600s)"]
-    C --> D["3. De-duplicate Timestamps (Retain 1st reading per second)"]
-    D --> E["4. Resample to 1-Minute Grid (Arithmetic Mean)"]
-    E --> F{"5. Gap Assessment"}
-    F -->|"Short Gaps <= 3 min (99.98% delta-t)"| G["Linear Interpolation (1,989 mins filled)"]
-    F -->|"Long Outages > 3 min"| H["Leave as NaN & Flag with outage_flag=True (121,530 mins)"]
-    G --> I["Cleaned 1-Minute Parquet (86.94% coverage)"]
-    H --> I
-```
-
-### 4.1 Order of Operations Justification
-1. **NaNs FIRST:** Filtering unphysical values *before* de-duplicating or resampling is essential. If a 98 kW glitch is not set to NaN first, it will corrupt the duplicate average or spread into neighboring 1-minute bins during interpolation.
-2. **Resampling Rule (Plain Mean vs Time-Weighted Mean):**
-   Because sensors poll nominally every 6–8 seconds (mean $\Delta t \approx 7.0\text{ s}$, standard deviation small), each 1-minute bin contains 8–10 approximately uniform samples. Comparing plain arithmetic mean against time-weighted integration ($\int P dt / \Delta t$) yields a **mean difference of only 3.04 Watts** with a **correlation of 0.9985**. Plain arithmetic mean was selected for computational speed and exact parity with NILMTK benchmarking standards.
-3. **Data-Driven Gap Threshold:**
-   Analysis of 3.37 million raw inter-reading intervals reveals:
-   - Median: 7.0 seconds
-   - 90th percentile: 15.0 seconds
-   - 99.0th percentile: 16.0 seconds
-   - 99.9th percentile: 24.0 seconds
-   - **99.98th percentile: $\le 120.0$ seconds (2 minutes)**.
-   Gaps $> 180\text{ s}$ (3 minutes) fall in the extreme top 0.014% of the distribution and represent hardware/network dropouts. Therefore:
-   - Gaps $\le 3\text{ minutes}$ are linearly interpolated (**1,989 minutes filled**).
-   - Gaps $> 3\text{ minutes}$ are strictly left as `NaN` and marked with `outage_flag = True` (**121,530 minutes flagged**).
+- **Order of Operations:** Unphysical spikes were set to `NaN` FIRST, then timestamps were de-duplicated, then resampled. If spikes are not removed first, they corrupt duplicate averages and spread into adjacent bins during interpolation.
+- **Resampling Method:** 1-minute arithmetic mean. Because sensors polled every 6–8 seconds (mean $\Delta t \approx 7.0\text{ s}$), sampling within each minute is nearly uniform; arithmetic mean differed from continuous time-weighted integration by a mean of only 3.04 W ($r = 0.9985$).
+- **Gap Interpolation Threshold:** Analysis of 3.37 million raw intervals showed that 99.98% of valid sensor arrivals were $\le 120\text{ s}$ (2 minutes). Therefore:
+  - Gaps $\le 3\text{ minutes}$ were linearly interpolated (**1,989 minutes filled**).
+  - Outages $> 3\text{ minutes}$ were flagged as unfillable NaNs (**121,530 minutes flagged**).
 
 ---
 
-## 5. Sanity Check Against Official Strathclyde Cleaned Benchmark
+## 4. Comparison with Official Strathclyde Cleaned Benchmark
 
-To verify pipeline correctness, our cleaned 1-minute series was compared against the official `CLEAN_House1.csv` resampled to 1 minute across **791,810 common valid minutes** (from `results/problem1_official_comparison.json`):
+Across **791,810 common valid minutes** between our cleaned 1-minute series and the official `CLEAN_House1.csv` resampled to 1 minute:
+- **Washing Machine (`Appliance5`):** **MAE = 3.91 Watts** (39.5% of the channel's 9.9 W mean power), Pearson $r = \mathbf{0.83282}$.
+- **Whole-Home `Aggregate`:** **MAE = 56.38 Watts** (11.7% of the channel's 481 W mean power), Pearson $r = \mathbf{0.86916}$.
 
-| Signal Evaluated | Mean Absolute Error (MAE) | Root Mean Squared Error (RMSE) | Pearson Correlation ($r$) |
-| :--- | :--- | :--- | :--- |
-| **Washing Machine (`Appliance5`)** | **3.91 Watts** | **79.66 Watts** | **0.83282** |
-| **Whole-Home `Aggregate`** | **56.38 Watts** | **392.36 Watts** | **0.86916** |
-
-### Statistical Agreement Interpretation
-The washing machine channel exhibits near-perfect agreement, matching the official benchmark to within **3.91 Watts MAE**. The modest difference in Aggregate (56 W MAE) occurs because the official Strathclyde cleaning pipeline forward-filled through multi-day outages and did not filter CT saturation spikes above 15 kW, whereas our pipeline strictly left outages $>3$ min as uncorrupted NaNs.
+*Why they differ:* The official Strathclyde cleaning pipeline forward-filled through multi-day outages and did not cap CT saturation spikes above 15 kW, whereas our pipeline left outages $> 3\text{ min}$ as uncorrupted NaNs.
 
 ---
 
-## 6. Channel Mappings Across Households
+## 5. Remaining Data Concerns
 
-From `CLEAN_READ_ME_081116.txt`, the washing machine is on different sub-meter columns in each household:
-
-| House | Washing Machine Channel | Manufacturer & Model | Total Monitoring Days | Reason for Inclusion / Exclusion |
-| :--- | :--- | :--- | :--- | :--- |
-| **House 1** | **`Appliance5`** | Beko WMC6140 | 639.0 days | **Included (Core):** Clean, unambiguous single washing machine. *(Note: App4 is Creda T522VW Tumble Dryer).* |
-| **House 2** | **`Appliance2`** | LG F1289TD | 617.4 days | **Included (Core):** Single machine, long eco-cycles. |
-| **House 3** | **`Appliance6`** | Unknown | 614.6 days | **Included (Core):** High frequency, single machine. |
-| **House 4** | **`Appliance4` & `Appliance5`** | Servis 6065 (WM1) & Zanussi Z917 (WM2) | 633.9 days | **Excluded from Modeling:** Contains two washing machines on the same aggregate meter, making the target ambiguous. |
-| **House 5** | **`Appliance3`** | AEG L99695HWD | 648.3 days | **Included (Core):** High-efficiency washer-dryer unit. |
-
----
-
-## 7. Remaining Data Concerns
-
-1. **Part-1 Ambiguity:** In House 1 prior to October 2014, disconnected sensors recorded `0` instead of `NaN`. While the machine is genuinely off most of the time, some true dropout periods in early 2014 appear as zero power.
-2. **Current Transformer Saturation:** In houses with electric showers (House 1), the CT clamp clips at 24 kW. While our 15 kW cap eliminates unphysical noise, the true transient peak of a simultaneous shower + kettle surge is physically lost.
+1. **Part-1 Zero Ambiguity:** Prior to October 2014, true sensor dropouts in House 1 cannot be distinguished from genuine 0 W idle states.
+2. **Current Transformer Satiation:** When an electric shower and kettle operate simultaneously, the raw CT clamp saturates at 24 kW; peak transient demand during those rare moments is physically lost.

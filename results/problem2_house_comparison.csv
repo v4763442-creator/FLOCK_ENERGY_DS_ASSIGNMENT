@@ -1,0 +1,5 @@
+house,appliance_channel,cycle_count,cycles_per_week,duration_mean_min,duration_median_min,duration_iqr_min,peak_mean_watts,peak_max_watts,energy_per_cycle_mean_kwh,energy_per_cycle_median_kwh,total_consumption_kwh
+1,Appliance5,382,4.18,43.4,33.0,4.0,2304.0,2461.8,0.375,0.322,143.32
+2,Appliance2,318,3.61,103.4,99.0,16.0,2093.7,2250.6,0.629,0.62,199.93
+3,Appliance6,647,7.37,68.9,66.0,7.5,1925.9,2592.0,0.575,0.553,371.96
+5,Appliance3,640,6.91,86.2,47.0,45.0,2055.5,2344.1,0.603,0.325,385.78

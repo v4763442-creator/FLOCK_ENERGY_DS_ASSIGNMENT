@@ -5,7 +5,7 @@ A production-grade, reproducible, and explainable Data Science take-home project
 This repository implements an end-to-end Non-Intrusive Load Monitoring (NILM) pipeline for **Washing Machine disaggregation** using the Strathclyde REFIT electrical load dataset:
 1. **Raw Sensor Cleaning (House 1):** Resolves multi-part boundary overlaps, fixes naive UK Daylight Savings Time jumps, de-duplicates sensor re-transmissions, applies physical spike caps, and resamples to 1-minute intervals.
 2. **Multi-House Washing Machine EDA:** Characterizes consumption across four core households (Houses 1, 2, 3, and 5) plus House 4, derives an empirical cycle detection rule via sensitivity analysis, and maps diurnal/weekly laundering habits.
-3. **Appliance Disaggregation Modeling:** Implements a leakage-free `HistGradientBoostingRegressor` using compact rolling aggregate features (61-minute centered window) against mandatory **Always-Off** and **Diurnal Profile** baselines, complete with Leave-One-House-Out cross-household generalization and failure analysis.
+3. **Appliance Disaggregation Modeling:** Implements an explainable, leakage-free `HistGradientBoostingRegressor` using 11 compact aggregate features (aggregate power now, 1-minute delta, and centered rolling mean, std, and max over 15, 60, and 120-minute windows) against mandatory **Always-Off** and **Hour-of-Day Mean** baselines, complete with Leave-One-House-Out cross-household generalization and failure analysis.
 4. **Utility Recommendations:** Outlines DSM demand-shifting strategies, an RCT Difference-in-Differences evaluation framework, and critical limitations of transferring UK models to India or 30-minute smart-meter data.
 
 ---
@@ -91,7 +91,7 @@ refit-nilm/
 │   ├── io_utils.py                 # Safe chunked loaders with explicit dtypes
 │   ├── cleaning.py                 # Spike filtering, BST->UTC fix, deduplication, 1-min resampler
 │   ├── cycles.py                   # Event detection, parameter sensitivity grid, metrics
-│   ├── features.py                 # 61-minute centered rolling features (float32 memory-safe)
+│   ├── features.py                 # 11 compact rolling aggregate features (float32 memory-safe)
 │   └── evaluation.py               # Continuous (MAE, RMSE, R2) & event metrics (Precision, Recall, F1)
 ├── notebooks/
 │   ├── 01_raw_cleaning.ipynb       # Problem 1: Raw House 1 cleaning & sanity check
@@ -103,7 +103,6 @@ refit-nilm/
 │   ├── problem1_official_comparison.json
 │   ├── problem2_eda.json / problem2_cycle_sensitivity.csv / problem2_house_comparison.csv
 │   ├── problem3_metrics.json / .csv / problem3_loho_generalization.csv
-│   ├── checkpoint_problem1.md / checkpoint_problem2.md / checkpoint_problem3.md
 │   └── final_audit.md              # Line-by-line verification against assignment PDF
 ├── DATA.md                         # Detailed dataset documentation, quality findings & cleaning
 ├── RESULTS.md                      # Comprehensive findings, embedded figures & failure analysis
@@ -129,7 +128,7 @@ refit-nilm/
 6. **Cycle Detection Rule:**  
    Derived via a 27-parameter sensitivity grid: `on_threshold = 15.0 W`, `min_peak = 500.0 W`, `merge_gap = 10 min`, `min_duration = 15 min`.
 7. **Leakage-Free Disaggregation Validation:**  
-   Contiguous chronological block splits (60% Train, 20% Val, 20% Test) with an excised **2-hour buffer gap** (120 min > 61 min window). Scalers and diurnal profile baselines were fit exclusively on the training block.
+   Contiguous chronological block splits (60% Train, 20% Val, 20% Test) with an excised **3-hour buffer gap** (180 min > 120 min max rolling window). Baselines were fit exclusively on the training block.
 8. **Memory Management on Laptops:**  
    To prevent out-of-memory errors on Windows laptops with constrained RAM, all raw streaming is handled line-by-line in pure Python, 1-minute cleaned series are cached to Parquet in `data/processed/`, and feature matrices use `float32`.
 
@@ -139,7 +138,7 @@ refit-nilm/
 
 ### Research Ideas Adopted
 1. **Nalmpantis et al. (Sensors 2022 — "Neural Fourier Energy Disaggregation"):**
-   - *Input Window Length:* Adopted the principle of matching window size to target appliance operating duration. In Problem 2, observed wash cycles had a median duration of 33–99 minutes; this directly guided our selection of a 61-minute centered window ($\pm 30$ min).
+   - *Input Window Length:* Adopted the principle of matching window size to target appliance operating duration. In Problem 2, observed wash cycles had a median duration of 33–99 minutes; this directly guided our selection of rolling windows (15, 60, and 120 minutes) spanning the active laundering range.
    - *Evaluation Methodology & Generalization Loss:* Adopted their dual-metric benchmark structure (combining continuous MAE/RMSE with event-level $F_1$) and their Leave-One-House-Out cross-building evaluation protocol to quantify generalization loss on unseen homes.
 2. **Murray et al. (2015 — "A data management platform for personalised real-time energy feedback"):**
    - Adopted the documented REFIT sub-meter cap ($4,000\text{ W}$) and daylight savings alignment.
