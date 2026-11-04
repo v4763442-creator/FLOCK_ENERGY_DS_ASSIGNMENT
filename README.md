@@ -117,6 +117,7 @@ refit-nilm/
 │   ├── cleaning.py                 # Spike caps, clock fixes, deduplication, and 1-minute averaging
 │   ├── cycles.py                   # Laundry cycle detection and parameter sensitivity grid
 │   ├── features.py                 # Compact aggregate features (11 simple rolling metrics)
+│   ├── model.py                    # Disaggregator ML model & baselines (HistGradientBoosting)
 │   └── evaluation.py               # Evaluation metrics (MAE, RMSE, R2, Precision, Recall, F1, Energy Error)
 │
 ├── figures/                        # 7 publication-quality charts generated directly from real data
